@@ -2,6 +2,38 @@ const keyString = "rVWxjr21gPj1XNBjvqoD2958huztj5orcIvpqQU3ZLxGSdY5t1"
 const keyV = CryptoJS.SHA256(keyString);
 const iv = CryptoJS.enc.Utf8.parse("3043369271225841");
 const baseURL = ""
+
+//constants
+const LobbyBase = Object.freeze({
+  id: null,
+  name: "",
+  mode: "",
+  users: {},
+  admins: [],
+  stats: {
+    user_count: 0,
+    admin_count: 0,
+    description: "N/A"
+  },
+  misc: {
+    real: false,
+    saves: true,
+    is_chattable: true
+  },
+  channels: [],
+  currentChannelID: 0,
+  currentChannel: null
+});
+
+const UserBase = Object.freeze({
+    username: "",
+    profile_photo: "",
+    token: null,
+    roles: [],
+    admin: false,
+    lobby_admin: false,
+})
+
 let lobby = 0;
 let username = "";
 let channel = 0;
@@ -178,9 +210,6 @@ async function isChattable() {
     const channelInfo = await getChannelInfo();
     await getUsername();
     const channelData = channelInfo[getCookie("channel")];
-    if (isAdmin) {
-        return true;
-    }
     return channelData && channelData.type !== "silent";
 }
 
@@ -254,9 +283,7 @@ async function getUsername(user = null) {
         if (usernameRequest.status != 200) {
             return null;
         }
-        username = data["name"].toString();
-        isAdmin = data["admin"];
-        return data["name"].toString();
+        return data;
     }
 }
 
@@ -405,6 +432,50 @@ async function auth(password = "") {
         headers: { lobby: parseInt(getCookie("lobby")), token: getCookie("token"), password: password }
     })
     return apply.status;
+}
+
+//Get a table which can be cached for the core lobby details; to update, call updateLobby instead
+async function getLobbyObject() {
+    const info = await getLobbyInfo();
+    const channels = await getChannelInfo();
+    const chattable = await isChattable();
+    let state = structuredClone(LobbyBase);
+
+    //core fields
+    state.name = info.name;
+    state.id = parseInt(getCookie("lobby")); //i know.
+    state.users = info.users;
+    state.admins = info.admins;
+    state.mode = info.mode;
+
+    //other shit
+    state.channels = channels;
+    state.currentChannelID = parseInt(getCookie("channel"));
+    state.currentChannel = channels[state.currentChannelID]
+
+    //stats
+    state.stats.admin_count = info.admin_count;
+    state.stats.user_count = info.user_count;
+    state.stats.description = info.description;
+
+    state.misc.real = info.real;
+    state.misc.saves = info.save;
+    state.misc.is_chattable = chattable;
+    return state;
+}
+
+//Gets a user object. You don't need to update this that often, once a reload is prob okay
+async function getUserObject() {
+    const stats = await getUsername();
+    const lobbyInfo = await getLobbyInfo(); //for admin checks
+    let newUser = structuredClone(UserBase);
+    newUser.username = stats.name;
+    newUser.admin = stats.admin;
+    newUser.lobby_admin = (lobbyInfo.admins.includes(stats.name)) //amazing i know
+    newUser.profile_photo = stats.profile_photo;
+    newUser.token = stats.token;
+
+    return newUser;
 }
 
 function setDefaultCookies() {

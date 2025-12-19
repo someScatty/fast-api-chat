@@ -16,7 +16,9 @@ const root = document.documentElement;
 const ls = document.getElementById("yay");
 const pfp = document.getElementById("pfp");
 const publi = document.getElementById("public");
-const icon = document.getElementById("icon")
+const icon = document.getElementById("icon");
+const settingsIcon = document.getElementById("lobbysettings");
+const usernameText = document.getElementById("usernameText");
 let max = 10;
 let msgList = null;
 let currentChannelId = null; // Track the current channel
@@ -30,15 +32,18 @@ let lobbytitle = "";
 let count = -1;
 let lockUI = true;
 
+
+let lobbyState = null;
+let userState = structuredClone(UserBase);
 //Event Listeners
-textBox.addEventListener("keydown", function(event) {
+textBox.addEventListener("keydown", function (event) {
     if (event.key === "Enter") {
         event.preventDefault();
         send();
 
     }
 })
-document.getElementById("profile-info").addEventListener("click", async function() {
+document.getElementById("profile-info").addEventListener("click", async function () {
     const file = await filePicker("image/*");
     if (file) {
         uploadProfilePhoto(file.contents);
@@ -53,8 +58,9 @@ opener.addEventListener("click", async () => {
         return;
     }
 });
- root.style.setProperty('--finder-width', '250px');
- root.style.setProperty('--sidebar-width', '250px');
+//WHY??
+root.style.setProperty('--finder-width', '250px');
+root.style.setProperty('--sidebar-width', '250px');
 document.addEventListener('mouseclick', (e) => {
     const headerRect = hdim.getBoundingClientRect();
     const sidebarRect = sidebar.getBoundingClientRect();
@@ -144,7 +150,7 @@ async function send() {
 }
 
 function getUserColor(user) {
-    if (!lobbyConfig || !lobbyConfig.users) {return "#000000"}
+    if (!lobbyConfig || !lobbyConfig.users) { return "#000000" }
     Object.entries(lobbyConfig.users).forEach(([key, person]) => {
         if (person.name == user) {
             if (person.roles.length > 0) {
@@ -196,7 +202,7 @@ async function refresh(full = false, msgs = null, appendToTop = false) {
         messageList.innerHTML = "";
         count = -1;
     }
-    if (msgs == null) {return}
+    if (msgs == null) { return }
     else {
         messages = msgs;
     }
@@ -205,11 +211,11 @@ async function refresh(full = false, msgs = null, appendToTop = false) {
     let users = []
     let high = false;
     let colored;
-        for (let i = 1; i < messages.length; i++) {
+    for (let i = 1; i < messages.length; i++) {
         const current = messages[i];
         if (!users.includes(current.user)) users.push(current.user);
-        }
-        let draw_ui = true;
+    }
+    let draw_ui = true;
     Object.entries(messages).forEach(async ([key, value]) => {
         colored = null;
         high = false;
@@ -217,7 +223,8 @@ async function refresh(full = false, msgs = null, appendToTop = false) {
         if ((key - count) > 0) {
             let colored = "#000000";
             for (let us of users) {
-                const usernameLower = username.toLowerCase();
+                
+                const usernameLower = userState.username.toLowerCase();
                 const usLower = us.toString().toLowerCase();
 
 
@@ -225,7 +232,7 @@ async function refresh(full = false, msgs = null, appendToTop = false) {
 
                 const ping = "@" + usLower;
                 const high = value.message.toLowerCase().includes(ping) && usLower === usernameLower;
-                console.log("High: " + high + " User: " + usLower + " Username: " + usernameLower, "users", users, "ping", ping, "message", value.message.toLowerCase());
+                console.log("High: " + high + " User: " + usLower + " userState.username: " + usernameLower, "users", users, "ping", ping, "message", value.message.toLowerCase());
 
                 if (high) {
                     value.message = value.message.replace(regex, (matched) => {
@@ -234,7 +241,7 @@ async function refresh(full = false, msgs = null, appendToTop = false) {
                     });
                 }
             }
-            if (value.render === false) {return}
+            if (value.render === false) { return }
             let messageBoxed = document.createElement("div");
             if (key > 9999999999) {
                 if (messages[key - 1].user == value.user && value.tp != "data" && messages[key - 1].tp != "data") {
@@ -244,7 +251,7 @@ async function refresh(full = false, msgs = null, appendToTop = false) {
                     const reactionDivs = messageBoxed.querySelectorAll('div.reactions');
                     reactionDivs.forEach(div => div.remove());
                     draw_ui = false;
-                }else{
+                } else {
                     draw_ui = true;
                 }
             }
@@ -354,13 +361,13 @@ async function refresh(full = false, msgs = null, appendToTop = false) {
                 messageBoxed.appendChild(holder);
             }
             messageBoxed.appendChild(messageItem);
-            if (value.user == username) {
+            if (value.user == userState.username) {
                 messageBoxed.classList.add("myMessages")
                 photo.src = value.profile_photo;
             }
             messageList.appendChild(messageBoxed);
             if (draw_ui) {
-            messageBoxed.appendChild(reactions);
+                messageBoxed.appendChild(reactions);
             }
         }
 
@@ -389,14 +396,34 @@ function main() {
     }
 }
 let lobbyConfig;
-async function start() {
-    await getUsername();
-    lobbyConfig = await updateLobbySettings({});
-    if (!isAdmin) {
-        create_channel.style.display = "none";
+
+//Function to show the settings window
+async function showSettingsWindow() {
+    lobbyConfig = await getLobbyInfo(lobby);
+
+
+    //check if we are NOT admin in this lobby
+    if (!userState.lobby_admin) {
+        //we'll fix this later, but for now just alert
+        alert("You are not an admin!");
+        settingsIcon.style.display = "none";
+        return;
     }
-    const lobby = getCookie("lobby");
-    chattable = await isChattable();
+
+    //Okay, so we are admin, *now* we can show it
+    const settingsContainer = document.getElementById("settings-container");
+    if (settingsContainer) {
+        settingsContainer.style.display = "flex";
+    } 
+};
+
+async function start() {
+    lobbyState = await getLobbyObject();
+    userState = await getUserObject();
+    chattable = lobbyState.misc.is_chattable;
+    //setting up global shit
+    if (userState.lobby_admin) {create_channel.style.display = "block"; settingsIcon.style.display = "flex";}
+    else{create_channel.style.display = "none"; settingsIcon.style.display = "none";}
     code = await auth();
     if (code != 200) {
         let pass;
@@ -415,14 +442,13 @@ async function start() {
             }
         }
     }
-    lobbyConfig = await getLobbyInfo(lobby);
-    //console.log(lobbyConfig);
-    if (lobbyConfig) {
-        if (!lobbyConfig.admins.includes(username) && !isAdmin) {
-            document.getElementById("lobbysettings").style.display = "none";
-            document.getElementById("lobbysettings").onclick = "alert('You need admin to access this page!')";
-        }
-    }
+    settingsIcon.addEventListener("click", showSettingsWindow);
+    usernameText.innerText= `@${userState.username}`;
+    //start other shit
+    setInterval(main, 100);
+    setInterval(looped, 1000, false);
+    setInterval(processChannels, 5000);
+    wss();
 }
 
 async function processChannels() {
@@ -476,11 +502,9 @@ replyButton.addEventListener("click", () => {
     replyID = -1;
     replyMessage = {};
 });
+
 function looped(loop) {
     lobby = changeLobby(-1);
-    if (pfptext.innerHTML != username) {
-        pfptext.innerHTML = username;
-    }
     if (!chattable) {
         textBox.disabled = true;
         textBox.placeholder = "You do not have permission to speak in this channel."
@@ -492,7 +516,7 @@ function looped(loop) {
         textBox.disabled = false;
         button.disabled = false;
         opener.disabled = false;
-        
+
         if (replyID > 0) {
             replyButton.style.display = "inline-block";
             textBox.placeholder = "Replying to %s...".replace("%s", replyMessage.user)
@@ -508,14 +532,13 @@ async function connect() {
     let params = {
         lobby: getCookie("lobby"),
         channel: getCookie("channel"),
-        username: username,
+        username: userState.username,
         token: getCookie("token")
     };
     await sendWSMessage({
         "type": "params",
         "content": params
     });
-    await getUsername();
     await sendWSMessage({
         "type": "read",
         "full": 'true'
@@ -523,7 +546,7 @@ async function connect() {
 }
 async function wss() {
     msgList = null;
-    await connectWebSocket(connect, null, function(data) {
+    await connectWebSocket(connect, null, function (data) {
         const info = JSON.parse(data);
         if (info.type == "read") {
             msgList = info.content;
@@ -543,8 +566,6 @@ async function wss() {
     });
 
 }
+
+
 start();
-setInterval(main, 100);
-setInterval(looped, 1000, false);
-setInterval(processChannels, 5000);
-wss();
