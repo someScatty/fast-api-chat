@@ -83,6 +83,11 @@ async def find():
 async def settings():
     return render_template('settings.html')
 
+
+@app.api_route('/profile')
+async def profile():
+    return render_template('profiles.html')
+
 @app.api_route("/")
 async def main():
     return render_template('chat.html') #someday..
