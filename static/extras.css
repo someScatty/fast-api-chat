@@ -51,7 +51,7 @@
   position: absolute;
   top: 10vh;
   left: 50vw;
-  transform: translateX(-50%);
+  transform: translateX(-500%);
   background-color: var(--primary-color);
   padding: 20px;
   font-size: 1vw;
