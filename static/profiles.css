@@ -78,7 +78,10 @@ div {
 
     display: grid;
     gap: 5px;
+}
 
-    float: left;
-    overflow:visible;
+#profile_thing {
+    width: 150px;
+    height: 100%;
+    background: none;
 }
